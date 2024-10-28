@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Canvas Measurement Tool</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        canvas {
+            cursor: crosshair;
+        }
+        #tooltip {
+            position: fixed;
+            background: rgba(0, 179, 255, 0.125);
+            color: rgb(0, 0, 0);
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-family: Arial, sans-serif;
+            font-weight: bold; /* Make font bold */
+            font-size: 18px; /* Increase font size */
+            pointer-events: none;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="mainCanvas"></canvas>
+    <div id="tooltip"></div>
+
+    <script>
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+        const tooltip = document.getElementById('tooltip');
+        let crosshairX = 0;
+        let crosshairY = 0;
+        let crosshair2X = 0;
+        let crosshair2Y = 0;
+        let currentImage = null;
+        let currentMouseX = 0;
+        let currentMouseY = 0;
+        var v100 = 1000000;
+        var x100 = 1000;
+        var y100 = 1000;
+        
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            v100 = (canvas.width * canvas.height);
+            if (currentImage) {
+                drawImageToCanvas(currentImage);
+            }
+            redraw();
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function drawImageToCanvas(img) {
+            const scale = Math.min(canvas.width / img.width, canvas.height / img.height);
+            const width = img.width * scale;
+            const height = img.height * scale;
+            const x = (canvas.width - width) / 2;
+            const y = (canvas.height - height) / 2;
+            ctx.drawImage(img, x, y, width, height);
+        }
+
+        function drawHyperbola() {
+            const relativeX = Math.abs(currentMouseX - crosshairX);
+            const relativeY = Math.abs(currentMouseY - crosshairY);
+
+            // Check if we are in a valid position to draw
+            if (relativeX === 0 || relativeY === 0) return;
+
+            const area = relativeX * relativeY;
+            ctx.strokeStyle = 'rgba(128, 0, 192, 1)';
+            ctx.lineWidth = 1;
+            
+            ctx.beginPath();
+            ctx.moveTo(currentMouseX, 0); // Starting point
+            ctx.lineTo(currentMouseX, canvas.height); // Ending point
+            ctx.stroke();            
+            ctx.beginPath();
+            ctx.moveTo(0, currentMouseY); // Starting point
+            ctx.lineTo(canvas.width, currentMouseY ); // Ending point
+            ctx.stroke();            
+
+            ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            const step = 5;
+
+            // Draw hyperbola based on the quadrant of the mouse position
+            if (currentMouseX > crosshairX && currentMouseY < crosshairY) { // Quadrant I (x > 0, y < 0)
+                for (let x = step; x <= canvas.width - 0.*crosshairX; x += step) {
+                    const y = area / x;
+                    if (y < (canvas.height - 0.*crosshairY) && y > 0) {
+                        ctx.lineTo(crosshairX + x, crosshairY - y);
+                    }
+                }
+            } else if (currentMouseX < crosshairX && currentMouseY < crosshairY) { // Quadrant II (x < 0, y < 0)
+                for (let x = step; x <= crosshairX; x += step) {
+                    const y = area / x;
+                    if (y < (canvas.height - 0.*crosshairY) && y > 0) {
+                        ctx.lineTo(crosshairX - x, crosshairY - y);
+                    }
+                }
+            } else if (currentMouseX < crosshairX && currentMouseY > crosshairY) { // Quadrant III (x < 0, y > 0)
+                for (let y = step; y <= canvas.height - crosshairY; y += step) {
+                    const x = area / y;
+                    if (x < (canvas.width - 0.*crosshairX) && x > 0) {
+                        ctx.lineTo(crosshairX - x, crosshairY + y);
+                    }
+                }
+            } else if (currentMouseX > crosshairX && currentMouseY > crosshairY) { // Quadrant IV (x > 0, y > 0)
+                for (let y = step; y <= canvas.height - 0.*crosshairY; y += step) {
+                    const x = area / y;
+                    if (x < (canvas.width - crosshairX) && x > 0) {
+                        ctx.lineTo(crosshairX + x, crosshairY + y);
+                    }
+                }
+            }
+            ctx.stroke();
+        }
+
+        document.addEventListener('paste', async (e) => {
+            e.preventDefault();
+            const items = (e.clipboardData || window.clipboardData).items;
+            
+            for (let item of items) {
+                if (item.type.indexOf('image') !== -1) {
+                    const blob = item.getAsFile();
+                    const img = new Image();
+                    img.src = URL.createObjectURL(blob);
+                    
+                    img.onload = () => {
+                        currentImage = img;
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        drawImageToCanvas(img);
+                        redraw();
+                    };
+                    break;
+                }
+            }
+        });
+
+        canvas.addEventListener('dblclick', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            crosshairX = e.clientX - rect.left;
+            crosshairY = e.clientY - rect.top;
+            redraw();
+        });
+
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            crosshair2X = e.clientX - rect.left;
+            crosshair2Y = e.clientY - rect.top;
+            v100 = Math.abs(currentMouseX - crosshairX) * Math.abs(currentMouseY - crosshairY);
+            x100 = Math.abs(currentMouseX - crosshairX) ;
+            y100 = Math.abs(currentMouseY - crosshairY) ;
+            redraw();
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            currentMouseX = e.clientX - rect.left;
+            currentMouseY = e.clientY - rect.top;
+            
+            var dX = Math.abs(currentMouseX - crosshairX);
+            var dY = Math.abs(currentMouseY - crosshairY);
+            const product = (dX * dY) / v100 * 100;
+            dX=dX*100/x100;
+            dY=dY*100/y100;
+            
+            tooltip.style.display = 'block';
+            // tooltip.style.left = (e.clientX + 10) + 'px';
+            // tooltip.style.top = (e.clientY - 40) + 'px';
+            tooltip.style.left = ( 10) + 'px';
+            tooltip.style.top = ( 10) + 'px';
+            //tooltip.textContent = product.toFixed(2) + '%';
+            tooltip.innerHTML = `dX: ${dX.toFixed(2)}%<br>dY: ${dY.toFixed(2)}%<br>dP: ${product.toFixed(2)}%`;            
+            
+            redraw();
+        });
+
+        canvas.addEventListener('mouseout', () => {
+            tooltip.style.display = 'none';
+            redraw();
+        });
+
+        function redraw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (currentImage) {
+                drawImageToCanvas(currentImage);
+            }
+
+            drawHyperbola();
+            
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(255, 0, 0, 1)';
+            ctx.lineWidth = 1;
+            
+            ctx.moveTo(0, crosshairY);
+            ctx.lineTo(canvas.width, crosshairY);
+            
+            ctx.moveTo(crosshairX, 0);
+            ctx.lineTo(crosshairX, canvas.height);
+            
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(0, 192, 0, .75)';
+            ctx.lineWidth = 1;
+            
+            ctx.moveTo(0, crosshair2Y);
+            ctx.lineTo(canvas.width, crosshair2Y);
+            
+            ctx.moveTo(crosshair2X, 0);
+            ctx.lineTo(crosshair2X, canvas.height);
+            
+            ctx.stroke();
+        }
+    </script>
+</body>
+</html>
